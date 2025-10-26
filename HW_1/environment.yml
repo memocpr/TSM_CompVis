@@ -1,0 +1,21 @@
+name: cv-hw1
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - numpy=1.26
+  - scipy=1.11
+  - scikit-image=0.24
+  - scikit-learn=1.5
+  - matplotlib=3.9
+  - jupyter=1.0
+  - ipykernel=6.29
+  - opencv=4.9
+  - pip:
+      - tqdm==4.66.5
+      - joblib==1.4.2
+      # Use Apple Silicon optimized TensorFlow on macOS; fallback to standard elsewhere
+      - tensorflow-macos==2.16.2; platform_system == 'Darwin'
+      - tensorflow==2.16.2; platform_system != 'Darwin'

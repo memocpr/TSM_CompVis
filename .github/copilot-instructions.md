@@ -42,4 +42,8 @@ Copilot may reference these folders to provide relevant context, examples, or ex
    - Avoid redundancy or verbose commentary.
    - Use comments in code to guide learning.
 
+6. **DO NOT**
+    - Make any changes unless explicitly asked for execution.
+    - Provide and code unless requested.
+
 ---

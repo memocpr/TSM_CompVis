@@ -1,0 +1,14 @@
+# Minimal deps for HW_1 digit extraction pipeline
+jupyter==1.0.0
+ipykernel==6.29.5
+numpy==1.26.4
+scipy==1.11.4
+matplotlib==3.9.2
+scikit-image==0.24.0
+opencv-python==4.10.0.84
+scikit-learn==1.5.2
+tqdm==4.66.5
+joblib==1.4.2
+# TensorFlow (choose variant per OS)
+tensorflow-macos==2.16.2; platform_system == 'Darwin'
+tensorflow==2.16.2; platform_system != 'Darwin'
