@@ -1,8 +1,9 @@
 import cv2
 import numpy as np
-from typing import List, Tuple, Optional
+from typing import Tuple, Optional
 
 # Simple Hough-based paper corner detector with contour fallback.
+
 
 def _order_quad(pts: np.ndarray) -> np.ndarray:
     # pts: (4,2)
@@ -47,6 +48,51 @@ def _approx_quad_from_contour(cnt: np.ndarray) -> Optional[np.ndarray]:
     rect = cv2.minAreaRect(hull)
     box = cv2.boxPoints(rect)  # returns 4x2 float32
     return box.astype(np.float32)
+
+
+def _safe_corner_subpix(gray: np.ndarray, pts: np.ndarray, win_size=(7,7)) -> np.ndarray:
+    """Clamp points to image bounds and try subpixel refinement; fallback to input on failure.
+
+    Improvements:
+    - Ensure points are sufficiently far from image border for the requested window size.
+    - Try progressively smaller windows (win_size -> (3,3) -> (1,1)).
+    - If no safe window, return clamped coarse points to avoid OpenCV assertion.
+    """
+    h, w = gray.shape[:2]
+    pts_in = pts.astype(np.float32).reshape(-1,2).copy()
+
+    # Clamp coordinates to valid pixel range
+    pts_clamped = pts_in.copy()
+    pts_clamped[:, 0] = np.clip(pts_clamped[:, 0], 0, w - 1)
+    pts_clamped[:, 1] = np.clip(pts_clamped[:, 1], 0, h - 1)
+
+    # Determine margins required so that the full search window fits inside the image
+    # Use the given win_size as the required radius margin (safe and conservative).
+    # Try the requested window, then smaller windows if necessary.
+    try_windows = [tuple(win_size), (3,3), (1,1)]
+    term = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 40, 0.01)
+
+    xs = pts_clamped[:,0]
+    ys = pts_clamped[:,1]
+
+    for wsz in try_windows:
+        margin_x = int(max(1, wsz[0]))
+        margin_y = int(max(1, wsz[1]))
+        # Check all points are at least margin pixels away from borders
+        inside = ((xs >= margin_x) & (xs < (w - margin_x)) &
+                  (ys >= margin_y) & (ys < (h - margin_y))).all()
+        if not inside:
+            continue
+        # Attempt refinement with this window size
+        try:
+            refined = cv2.cornerSubPix(gray, pts_clamped.reshape(-1,1,2), wsz, (-1,-1), term)
+            return refined.reshape(-1,2).astype(np.float32)
+        except Exception:
+            # try next smaller window
+            continue
+
+    # If we reach here, no safe refinement was possible; return clamped coarse points
+    return pts_clamped.astype(np.float32)
 
 
 def detect_paper_corners(bgr: np.ndarray) -> Optional[np.ndarray]:
@@ -104,19 +150,22 @@ def detect_paper_corners(bgr: np.ndarray) -> Optional[np.ndarray]:
                 y = (C1*A2 - C2*A1)/D
                 return np.array([x,y], dtype=np.float64)
             pts = []
+            hS, wS = small.shape[:2]
             for Lh in linesA:
                 for Lv in linesB:
                     p = intersect(Lh, Lv)
                     if p is not None:
-                        pts.append(p)
+                        # keep only intersections inside the downscaled image
+                        if 0 <= p[0] < wS and 0 <= p[1] < hS:
+                            pts.append(p)
             if len(pts) >= 4:
-                pts = np.array(pts) / scale
+                pts = np.array(pts, dtype=np.float32)
                 ordered = _order_quad(pts[:4])
-                # Optional: refine corners on full-res
-                term = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 0.01)
-                pts_in = ordered.astype(np.float32).reshape(-1,1,2)
-                corners_ref = cv2.cornerSubPix(gray, pts_in, (5,5), (-1,-1), term)
-                return corners_ref.reshape(-1,2).astype(np.float32)
+                # Map to full-res scale
+                ordered_full = (ordered / scale).astype(np.float32)
+                # Refine corners on full-res safely
+                corners_ref = _safe_corner_subpix(gray, ordered_full, win_size=(5,5))
+                return corners_ref.astype(np.float32)
 
     # Fallback: robust contour-based quadrilateral detection
     # 1) Light normalization and denoise on downscaled image
@@ -172,10 +221,8 @@ def detect_paper_corners(bgr: np.ndarray) -> Optional[np.ndarray]:
     # Map to original scale
     quad_full = best_quad / scale
 
-    # Refine corners on full-res image for subpixel accuracy
-    term = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 40, 0.01)
-    pts_in = quad_full.astype(np.float32).reshape(-1,1,2)
-    corners_ref = cv2.cornerSubPix(gray, pts_in, (7,7), (-1,-1), term)
+    # Refine corners on full-res image for subpixel accuracy (safely)
+    corners_ref = _safe_corner_subpix(gray, quad_full.astype(np.float32), win_size=(7,7))
 
     return corners_ref.reshape(-1,2).astype(np.float32)
 

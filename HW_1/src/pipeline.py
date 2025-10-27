@@ -3,7 +3,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from HW_1.src.model import load_or_train_default
+# Use relative imports within the HW_1.src package
+from .model import load_or_train_default, predict_digits
 from .paper_detect import detect_paper_corners, warp_to_a4
 from .segments import binarize, extract_components, crop_and_resize
 

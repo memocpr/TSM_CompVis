@@ -50,23 +50,15 @@ def load_or_train_default(model_path: str):
 
 
 def predict_digits(model, patches: np.ndarray) -> np.ndarray:
-    """Classify 28x28 patches (uint8 or float, auto-normalized) and return digit predictions."""
-    tf = _require_tensorflow()
-    # Ensure patches are float32 in [0,1]
-    p = patches.astype('float32')
-    if p.max() > 1.0:
-        p = p / 255.0
-    if len(p.shape) == 3:
-        p = np.expand_dims(p, -1)  # Add channel dim if needed
-    preds = model.predict(p, verbose=0)
-    return np.argmax(preds, axis=1)
-
-
-def predict_digits(model, patches: np.ndarray) -> np.ndarray:
-    # patches: (N,28,28) uint8 or float
+    """Classify 28x28 patches (uint8 or float, auto-normalized) and return digit predictions.
+    Accepts (N,28,28) or (N,28,28,1).
+    """
     if model is None:
         raise RuntimeError("No classification model available; TensorFlow is not installed.")
-    x = patches.astype('float32')/255.0
-    x = np.expand_dims(x, -1)
+    x = patches.astype('float32')
+    if x.max() > 1.0:
+        x = x / 255.0
+    if x.ndim == 3:
+        x = np.expand_dims(x, -1)
     probs = model.predict(x, verbose=0)
     return probs.argmax(axis=1)

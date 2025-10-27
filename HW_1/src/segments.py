@@ -52,10 +52,12 @@ def crop_and_resize(gray_or_bgr: np.ndarray, box: Tuple[int,int,int,int], size: 
     # Keep aspect and pad to square
     h0, w0 = crop.shape
     m = max(h0, w0)
+    # background assumed light; start with zeros (black background)
     canvas = np.zeros((m,m), dtype=np.uint8)
     y_off = (m - h0)//2
     x_off = (m - w0)//2
     canvas[y_off:y_off+h0, x_off:x_off+w0] = crop
     resized = cv2.resize(canvas, (size,size), interpolation=cv2.INTER_AREA)
+    # Invert so digits are bright on dark (MNIST style)
+    resized = cv2.bitwise_not(resized)
     return resized
-
